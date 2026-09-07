@@ -11,4 +11,14 @@ Lifecycle:
 
 Commits close their issue with `Closes #N` in the message, so the GitHub issue closes automatically when the commit lands on the default branch.
 
+## Session isolation
+
+PM, engineer, and QA are three separate Claude Code sessions — never the same session playing more than one role on the same issue. Concretely:
+
+- Session A (PM) grooms the issue into `_docs/task-template.md` shape and stops. It does not touch code.
+- Session B (engineer) receives only the groomed issue and implements it. It does not review its own work.
+- Session C (QA) receives only the groomed issue and the repo state — never session B's transcript or reasoning — and checks the implementation against the issue's Acceptance Criteria only, returning PASS or FAIL.
+
+This is the one rule in the whole process that must not be skipped under time pressure: it's what makes "QA'd" mean something other than the engineer re-reading its own diff. Everything else in this file can be compressed if we're behind schedule; this can't.
+
 Nothing here is automated yet — no CI, no test suite runs any of this. Grooming, implementation, and QA are each done by reading the issue and the code by hand.
