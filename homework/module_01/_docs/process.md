@@ -13,6 +13,8 @@ Commits close their issue with `Closes #N` in the message, so the GitHub issue c
 
 ## Session isolation
 
+Before pasting any role's prompt (PM, engineer, or QA), run `/clear` in this terminal, or start a genuinely new Claude Code session in a fresh terminal — not `claude --continue` or `--resume`. This applies every time the role changes, even mid-task: reusing a session's conversation history across roles defeats the isolation this section exists for. A session that already discussed the implementation is not a valid QA session for it, even if it's told to "act as QA now."
+
 PM, engineer, and QA are three separate Claude Code sessions — never the same session playing more than one role on the same issue. Concretely:
 
 - Session A (PM) grooms the issue into `_docs/task-template.md` shape and stops. It does not touch code.
