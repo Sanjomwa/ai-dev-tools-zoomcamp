@@ -216,3 +216,17 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Django extras not in the default Python template
+staticfiles/
+media/
+
+# Node, if any module needs it
+node_modules/
+dist/
+build/
+.next/
+
+# Secrets
+.env
+.env.*
