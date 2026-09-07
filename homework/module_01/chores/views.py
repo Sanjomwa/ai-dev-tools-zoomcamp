@@ -1,9 +1,9 @@
-from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from .guards import require_identity
-from .models import Household, Member
+from .models import Chore, Household, Member
 
 
 def identity_pick(request):
@@ -30,13 +30,19 @@ def chore_list(request):
     return render(request, "chores/chore_list.html", {"chores": chores})
 
 
-# --- STUB: issue #6 (mark-done action) ---------------------------------------
-# Real behaviour (set last_completed_at to now, advance current_holder to the
-# next member in rotation) is issue #6's scope and is intentionally not built
-# here. This stub exists only so issue #4's session-identity guard can be
-# applied to a real endpoint and its acceptance criteria verified now. It is
-# POST-only and wrapped in the same require_identity decorator as chore_list.
 @require_identity
 @require_POST
 def mark_done(request, chore_id):
-    return HttpResponse("Mark-done not yet implemented, see issue #6.")
+    chore = get_object_or_404(Chore, pk=chore_id)
+    # "Next in rotation" is the following entry in the household's Meta-ordered
+    # member list, wrapping to the first. Computed by position in that list, not
+    # by `order + 1`: `order` can have gaps once a member is deleted, and a
+    # single-member household must wrap to itself.
+    members = list(chore.household.members.all())
+    member_ids = [member.pk for member in members]
+    next_index = (member_ids.index(chore.current_holder_id) + 1) % len(members)
+
+    chore.current_holder = members[next_index]
+    chore.last_completed_at = timezone.now()
+    chore.save()
+    return redirect("chore_list")
