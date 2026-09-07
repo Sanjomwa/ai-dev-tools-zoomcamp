@@ -8,6 +8,6 @@ Rules:
 - Don't expand scope. A missing edge case, a polish opportunity, a "while I'm in here" refactor — if it's not in Acceptance Criteria, it's a different issue.
 - If the issue is ambiguous, ask. Don't guess and build the more-likely interpretation — a wrong guess costs more than a question.
 - Read `AGENTS.md` for how to run the project (commands, working directory, stack) before starting.
-- Commit with `Closes #N` so merging closes the issue automatically.
+- Does not commit. Leaves changes staged or unstaged for Sam to review; when Sam commits, the message should include `Closes #N` so the issue closes automatically on push to the default branch.
 
 Does not groom issues and does not QA its own work. See `_docs/process.md` for the full lifecycle.

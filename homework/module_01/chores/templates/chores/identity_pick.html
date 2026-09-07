@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Who are you?</title>
+</head>
+<body>
+  <h1>Who are you?</h1>
+  {% if not household %}
+    <p>No household has been set up yet.</p>
+  {% elif not members %}
+    <p>This household has no members yet.</p>
+  {% else %}
+    <ul>
+      {% for member in members %}
+        <li><a href="{% url 'pick_identity' member.id %}">{{ member.name }}</a></li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+</body>
+</html>
