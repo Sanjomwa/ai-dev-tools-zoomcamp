@@ -27,3 +27,19 @@ class Member(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.household})"
+
+
+class Chore(models.Model):
+    class Cadence(models.TextChoices):
+        DAILY = "daily", "Daily"
+        WEEKLY = "weekly", "Weekly"
+        MONTHLY = "monthly", "Monthly"
+
+    household = models.ForeignKey(Household, on_delete=models.CASCADE, related_name="chores")
+    name = models.CharField(max_length=100)
+    cadence = models.CharField(max_length=10, choices=Cadence.choices)
+    current_holder = models.ForeignKey(Member, on_delete=models.PROTECT, related_name="chores")
+    last_completed_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.name} ({self.household})"
