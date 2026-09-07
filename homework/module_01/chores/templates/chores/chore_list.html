@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Chores</title>
+</head>
+<body>
+  <h1>Chores</h1>
+  {% if not chores %}
+    <p>No chores yet.</p>
+  {% else %}
+    <ul>
+      {% for chore in chores %}
+        <li>{{ chore.name }} &mdash; {{ chore.get_cadence_display }} &mdash; {{ chore.current_holder.name }}</li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+</body>
+</html>
