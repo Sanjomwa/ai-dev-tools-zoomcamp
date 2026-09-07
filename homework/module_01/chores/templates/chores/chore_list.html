@@ -10,7 +10,10 @@
   {% else %}
     <ul>
       {% for chore in chores %}
-        <li>{{ chore.name }} &mdash; {{ chore.get_cadence_display }} &mdash; {{ chore.current_holder.name }}</li>
+        <li>
+          {{ chore.name }} &mdash; {{ chore.get_cadence_display }} &mdash; {{ chore.current_holder.name }}
+          {% if chore.is_overdue %}<span class="overdue-flag" style="color: #b00; font-weight: bold;">&#9888; Overdue</span>{% endif %}
+        </li>
       {% endfor %}
     </ul>
   {% endif %}
