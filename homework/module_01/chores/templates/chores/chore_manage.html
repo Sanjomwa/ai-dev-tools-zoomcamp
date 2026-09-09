@@ -1,9 +1,8 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Manage chores</title>
-</head>
-<body>
+{% extends "chores/base.html" %}
+
+{% block title %}Manage chores{% endblock %}
+
+{% block content %}
   <h1>Manage chores</h1>
 
   {% if messages %}
@@ -74,5 +73,4 @@
       </form>
     {% endif %}
   {% endif %}
-</body>
-</html>
+{% endblock %}

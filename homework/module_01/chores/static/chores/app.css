@@ -1,0 +1,144 @@
+/* Shared visual styling for the chores app — issue #12. Visual only: no
+   layout behaviour the templates relied on changes here. */
+
+:root {
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --text: #22262e;
+  --muted: #5b6472;
+  --border: #d3d8e0;
+  --accent: #2f6feb;
+  --accent-hover: #245cc4;
+  --overdue: #b00020;
+  --success-bg: #e7f6ec;
+  --success-border: #9bd6ae;
+  --success-text: #1c5a33;
+  --error-bg: #fdecea;
+  --error-border: #f1b0ab;
+  --error-text: #8a1c13;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+}
+
+.container {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 3rem;
+}
+
+h1 {
+  font-size: 1.6rem;
+  margin: 0 0 1rem;
+}
+
+h2 {
+  font-size: 1.2rem;
+  margin: 2rem 0 0.75rem;
+}
+
+h3 {
+  font-size: 1rem;
+  margin: 1.5rem 0 0.5rem;
+}
+
+p {
+  margin: 0.5rem 0;
+}
+
+a {
+  color: var(--accent);
+}
+
+a:hover {
+  color: var(--accent-hover);
+}
+
+ul,
+ol {
+  padding-left: 1.5rem;
+}
+
+li {
+  margin: 0.4rem 0;
+}
+
+/* Forms & controls */
+form {
+  margin: 0.5rem 0;
+}
+
+input[type="text"],
+select {
+  font: inherit;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+input[type="text"]:focus,
+select:focus,
+button:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+button {
+  font: inherit;
+  padding: 0.4rem 0.9rem;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+
+button:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+/* Overdue flag — replaces the former inline style on chore_list.html */
+.overdue-flag {
+  color: var(--overdue);
+  font-weight: bold;
+  margin-left: 0.25rem;
+}
+
+/* Django messages framework — success and error must read differently */
+ul.messages {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1.5rem;
+}
+
+ul.messages li {
+  padding: 0.6rem 0.9rem;
+  margin: 0.4rem 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+}
+
+ul.messages li.success {
+  background: var(--success-bg);
+  border-color: var(--success-border);
+  color: var(--success-text);
+}
+
+ul.messages li.error {
+  background: var(--error-bg);
+  border-color: var(--error-border);
+  color: var(--error-text);
+}

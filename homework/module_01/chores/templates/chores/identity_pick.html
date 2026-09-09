@@ -1,9 +1,8 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Who are you?</title>
-</head>
-<body>
+{% extends "chores/base.html" %}
+
+{% block title %}Who are you?{% endblock %}
+
+{% block content %}
   <h1>Who are you?</h1>
   {% if not household %}
     <p>No household has been set up yet.</p>
@@ -19,5 +18,4 @@
     </ul>
     <p><a href="{% url 'household_manage' %}">Manage household</a></p>
   {% endif %}
-</body>
-</html>
+{% endblock %}
