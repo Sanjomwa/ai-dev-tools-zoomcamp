@@ -38,7 +38,14 @@ def chore_list(request):
     # there are no Members and require_identity already redirected. The branch
     # is kept as belt-and-braces so a direct call can't raise.
     chores = household.chores.select_related("current_holder").all() if household else []
-    return render(request, "chores/chore_list.html", {"chores": chores})
+    # The template compares this against each chore.current_holder_id to decide
+    # whether to render an actionable mark-done control (issue #8's 403 is the
+    # server-side backstop). require_identity guarantees the key is set.
+    return render(
+        request,
+        "chores/chore_list.html",
+        {"chores": chores, "current_member_id": request.session["member_id"]},
+    )
 
 
 @require_identity

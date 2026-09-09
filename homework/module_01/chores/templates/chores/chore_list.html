@@ -14,6 +14,12 @@
         <li>
           {{ chore.name }} &mdash; {{ chore.get_cadence_display }} &mdash; {{ chore.current_holder.name }}
           {% if chore.is_overdue %}<span class="overdue-flag" style="color: #b00; font-weight: bold;">&#9888; Overdue</span>{% endif %}
+          {% if chore.current_holder_id == current_member_id %}
+            <form method="post" action="{% url 'mark_done' chore.id %}">
+              {% csrf_token %}
+              <button type="submit">Mark done</button>
+            </form>
+          {% endif %}
         </li>
       {% endfor %}
     </ul>
