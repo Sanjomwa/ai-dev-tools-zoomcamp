@@ -608,3 +608,120 @@ class SeedDemoCommandTests(AuthClientMixin, TestCase):
         chore.refresh_from_db()
         self.assertEqual(chore.current_holder, rotated_holder)
         self.assertEqual(chore.last_completed_at, stamp)
+
+
+class HouseholdManageTests(TestCase):
+    """The in-app household/member management UI (issue #9)."""
+
+    def test_page_is_not_gated_by_require_identity(self):
+        # No session, no members -- the page must still render so a brand-new
+        # household can be populated from zero.
+        Household.objects.create(name="H")
+        resp = self.client.get(reverse("household_manage"))
+        self.assertEqual(resp.status_code, 200)
+
+    def test_page_shows_household_name_and_members_in_rotation_order(self):
+        h = Household.objects.create(name="The Nest")
+        Member.objects.create(household=h, name="Alice")            # order 0, inserted 1st
+        Member.objects.create(household=h, name="Carol", order=5)   # inserted 2nd
+        Member.objects.create(household=h, name="Bob", order=2)     # inserted 3rd
+        body = self.client.get(reverse("household_manage")).content.decode()
+        self.assertIn("The Nest", body)
+        # Meta ordering is ["order"], so the page must read Alice, Bob, Carol
+        # despite the insertion order.
+        self.assertLess(body.index("Alice"), body.index("Bob"))
+        self.assertLess(body.index("Bob"), body.index("Carol"))
+
+    def test_add_member_appends_to_end_of_rotation_via_auto_order(self):
+        h = Household.objects.create(name="H")
+        Member.objects.create(household=h, name="A")  # order 0
+        Member.objects.create(household=h, name="B")  # order 1
+        resp = self.client.post(reverse("add_member"), {"name": "C"}, follow=True)
+        self.assertEqual(resp.status_code, 200)
+        added = Member.objects.get(name="C")
+        self.assertEqual(added.household, h)
+        self.assertEqual(added.order, 2)
+        self.assertEqual(
+            list(h.members.values_list("name", flat=True)), ["A", "B", "C"]
+        )
+
+    def test_add_member_rejects_a_blank_name(self):
+        h = Household.objects.create(name="H")
+        resp = self.client.post(reverse("add_member"), {"name": "   "}, follow=True)
+        self.assertEqual(h.members.count(), 0)
+        self.assertContains(resp, "blank")
+
+    def test_rename_member_is_reflected_in_chore_list_and_identity_pick(self):
+        h = Household.objects.create(name="H")
+        m = Member.objects.create(household=h, name="OldName")
+        Chore.objects.create(
+            household=h, name="Dishes", cadence=Chore.Cadence.DAILY, current_holder=m
+        )
+        self.client.post(reverse("rename_member", args=[m.id]), {"name": "NewName"})
+        m.refresh_from_db()
+        self.assertEqual(m.name, "NewName")
+
+        session = self.client.session
+        session["member_id"] = m.id
+        session.save()
+        self.assertContains(self.client.get(reverse("chore_list")), "NewName")
+        self.assertContains(self.client.get(reverse("identity_pick")), "NewName")
+
+    def test_rename_household_is_reflected_in_chore_list_and_identity_pick(self):
+        h = Household.objects.create(name="Old House")
+        m = Member.objects.create(household=h, name="M")
+        Chore.objects.create(
+            household=h, name="Dishes", cadence=Chore.Cadence.DAILY, current_holder=m
+        )
+        self.client.post(reverse("rename_household"), {"name": "New House"})
+        h.refresh_from_db()
+        self.assertEqual(h.name, "New House")
+
+        session = self.client.session
+        session["member_id"] = m.id
+        session.save()
+        self.assertContains(self.client.get(reverse("chore_list")), "New House")
+        self.assertContains(self.client.get(reverse("identity_pick")), "New House")
+
+    def test_remove_member_without_a_chore_deletes_them(self):
+        h = Household.objects.create(name="H")
+        keep = Member.objects.create(household=h, name="Keep")
+        drop = Member.objects.create(household=h, name="Drop")
+        resp = self.client.post(reverse("remove_member", args=[drop.id]), follow=True)
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(Member.objects.filter(pk=drop.pk).exists())
+        self.assertTrue(Member.objects.filter(pk=keep.pk).exists())
+
+    def test_remove_member_holding_a_chore_does_not_500_and_shows_a_message(self):
+        h = Household.objects.create(name="H")
+        holder = Member.objects.create(household=h, name="Holder")
+        Chore.objects.create(
+            household=h, name="Dishes", cadence=Chore.Cadence.DAILY, current_holder=holder
+        )
+        resp = self.client.post(
+            reverse("remove_member", args=[holder.id]), follow=True
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(Member.objects.filter(pk=holder.pk).exists())
+        self.assertContains(resp, "currently hold")
+
+    def test_management_flow_never_creates_a_second_household(self):
+        h = Household.objects.create(name="H")
+        self.client.post(reverse("add_member"), {"name": "A"})
+        self.client.post(reverse("rename_household"), {"name": "Renamed"})
+        self.assertEqual(Household.objects.count(), 1)
+
+    def test_management_views_do_not_500_when_no_household_exists(self):
+        self.assertEqual(self.client.get(reverse("household_manage")).status_code, 200)
+        self.assertEqual(
+            self.client.post(reverse("add_member"), {"name": "A"}, follow=True).status_code,
+            200,
+        )
+        self.assertEqual(
+            self.client.post(
+                reverse("rename_household"), {"name": "X"}, follow=True
+            ).status_code,
+            200,
+        )
+        self.assertEqual(Household.objects.count(), 0)
+        self.assertEqual(Member.objects.count(), 0)

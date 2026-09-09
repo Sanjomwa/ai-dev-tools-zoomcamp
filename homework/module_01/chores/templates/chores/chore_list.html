@@ -4,7 +4,7 @@
   <title>Chores</title>
 </head>
 <body>
-  <h1>Chores</h1>
+  <h1>{% if household %}{{ household.name }} &mdash; {% endif %}Chores</h1>
   <p><a href="{% url 'switch_identity' %}">Switch identity</a></p>
   {% if not chores %}
     <p>No chores yet.</p>

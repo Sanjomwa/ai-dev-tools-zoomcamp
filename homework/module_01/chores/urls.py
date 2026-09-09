@@ -8,4 +8,9 @@ urlpatterns = [
     path("identity/switch/", views.switch_identity, name="switch_identity"),
     path("chores/", views.chore_list, name="chore_list"),
     path("chores/<int:chore_id>/done/", views.mark_done, name="mark_done"),
+    path("household/", views.household_manage, name="household_manage"),
+    path("household/rename/", views.rename_household, name="rename_household"),
+    path("household/members/add/", views.add_member, name="add_member"),
+    path("household/members/<int:member_id>/rename/", views.rename_member, name="rename_member"),
+    path("household/members/<int:member_id>/remove/", views.remove_member, name="remove_member"),
 ]

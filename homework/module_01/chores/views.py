@@ -1,3 +1,5 @@
+from django.contrib import messages
+from django.db.models import ProtectedError
 from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -44,7 +46,11 @@ def chore_list(request):
     return render(
         request,
         "chores/chore_list.html",
-        {"chores": chores, "current_member_id": request.session["member_id"]},
+        {
+            "household": household,
+            "chores": chores,
+            "current_member_id": request.session["member_id"],
+        },
     )
 
 
@@ -68,3 +74,86 @@ def mark_done(request, chore_id):
     chore.last_completed_at = timezone.now()
     chore.save()
     return redirect("chore_list")
+
+
+# --- Household / member management (issue #9) -------------------------------
+#
+# Not guarded with require_identity: this UI has to work before any member
+# exists, so that a brand-new household can be populated from zero. It manages
+# the single existing household only (decisions.md #6) — no page here creates a
+# Household, and there is deliberately no form to do so.
+
+
+def household_manage(request):
+    household = Household.objects.first()
+    members = household.members.all() if household else []
+    return render(
+        request,
+        "chores/household_manage.html",
+        {"household": household, "members": members},
+    )
+
+
+@require_POST
+def rename_household(request):
+    household = Household.objects.first()
+    if household is None:
+        messages.error(request, "No household has been set up yet.")
+        return redirect("household_manage")
+    name = request.POST.get("name", "").strip()
+    if not name:
+        messages.error(request, "Household name can't be blank.")
+        return redirect("household_manage")
+    household.name = name
+    household.save()
+    messages.success(request, "Household renamed.")
+    return redirect("household_manage")
+
+
+@require_POST
+def add_member(request):
+    household = Household.objects.first()
+    if household is None:
+        messages.error(request, "No household has been set up yet.")
+        return redirect("household_manage")
+    name = request.POST.get("name", "").strip()
+    if not name:
+        messages.error(request, "Member name can't be blank.")
+        return redirect("household_manage")
+    # Don't pass order= — Member.save() assigns it by creation order, placing
+    # the new member at the end of the rotation.
+    Member.objects.create(household=household, name=name)
+    messages.success(request, f'Added "{name}".')
+    return redirect("household_manage")
+
+
+@require_POST
+def rename_member(request, member_id):
+    member = get_object_or_404(Member, pk=member_id)
+    name = request.POST.get("name", "").strip()
+    if not name:
+        messages.error(request, "Member name can't be blank.")
+        return redirect("household_manage")
+    member.name = name
+    member.save()
+    messages.success(request, "Member renamed.")
+    return redirect("household_manage")
+
+
+@require_POST
+def remove_member(request, member_id):
+    member = get_object_or_404(Member, pk=member_id)
+    try:
+        member.delete()
+    except ProtectedError:
+        # Chore.current_holder is on_delete=PROTECT: a member currently holding
+        # a chore can't be removed. Surface it as a readable message instead of
+        # a 500.
+        messages.error(
+            request,
+            f'Can\'t remove "{member.name}" — they currently hold one or more '
+            "chores. Mark those chores done (or reassign them) first.",
+        )
+        return redirect("household_manage")
+    messages.success(request, f'Removed "{member.name}".')
+    return redirect("household_manage")

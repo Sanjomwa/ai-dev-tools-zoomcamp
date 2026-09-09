@@ -9,12 +9,15 @@
     <p>No household has been set up yet.</p>
   {% elif not members %}
     <p>This household has no members yet.</p>
+    <p><a href="{% url 'household_manage' %}">Add the first member</a></p>
   {% else %}
+    <p>Household: {{ household.name }}</p>
     <ul>
       {% for member in members %}
         <li><a href="{% url 'pick_identity' member.id %}">{{ member.name }}</a></li>
       {% endfor %}
     </ul>
+    <p><a href="{% url 'household_manage' %}">Manage household</a></p>
   {% endif %}
 </body>
 </html>

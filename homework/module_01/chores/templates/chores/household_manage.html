@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Manage household</title>
+</head>
+<body>
+  <h1>Manage household</h1>
+
+  {% if messages %}
+    <ul class="messages">
+      {% for message in messages %}
+        <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+
+  {% if not household %}
+    <p>No household has been set up yet.</p>
+  {% else %}
+    <h2>Household name</h2>
+    <form method="post" action="{% url 'rename_household' %}">
+      {% csrf_token %}
+      <input type="text" name="name" value="{{ household.name }}" aria-label="Household name">
+      <button type="submit">Rename household</button>
+    </form>
+
+    <h2>Members</h2>
+    <p>Listed in rotation order.</p>
+    {% if not members %}
+      <p>This household has no members yet.</p>
+    {% else %}
+      <ol>
+        {% for member in members %}
+          <li>
+            <form method="post" action="{% url 'rename_member' member.id %}" style="display: inline;">
+              {% csrf_token %}
+              <input type="text" name="name" value="{{ member.name }}" aria-label="Member name">
+              <button type="submit">Rename</button>
+            </form>
+            <form method="post" action="{% url 'remove_member' member.id %}" style="display: inline;">
+              {% csrf_token %}
+              <button type="submit">Remove</button>
+            </form>
+          </li>
+        {% endfor %}
+      </ol>
+    {% endif %}
+
+    <h3>Add a member</h3>
+    <form method="post" action="{% url 'add_member' %}">
+      {% csrf_token %}
+      <input type="text" name="name" aria-label="New member name">
+      <button type="submit">Add member</button>
+    </form>
+  {% endif %}
+</body>
+</html>
