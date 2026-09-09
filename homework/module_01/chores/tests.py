@@ -423,6 +423,45 @@ class IdentityPickTests(TestCase):
         self.assertEqual(self.client.session["member_id"], bob.id)
 
 
+class SwitchIdentityTests(AuthClientMixin, TestCase):
+    """The switch-identity link/view (issue #11)."""
+
+    def setUp(self):
+        self.h = Household.objects.create(name="H")
+        self.alice = Member.objects.create(household=self.h, name="Alice")
+        self.bob = Member.objects.create(household=self.h, name="Bob")
+
+    def test_switch_clears_the_session_and_redirects_to_identity_pick(self):
+        self.login_as(self.alice)
+        resp = self.client.get(reverse("switch_identity"))
+        self.assertRedirects(resp, reverse("identity_pick"))
+        self.assertNotIn("member_id", self.client.session)
+
+    def test_chore_list_offers_the_switch_link(self):
+        self.login_as(self.alice)
+        resp = self.client.get(reverse("chore_list"))
+        self.assertContains(resp, reverse("switch_identity"))
+
+    def test_chores_page_redirects_to_identity_pick_after_switching(self):
+        # AC #2: a fresh request to /chores/ must fall back through the
+        # require_identity guard once the identity has been cleared.
+        self.login_as(self.alice)
+        self.client.get(reverse("switch_identity"))
+        resp = self.client.get(reverse("chore_list"))
+        self.assertRedirects(resp, reverse("identity_pick"))
+
+    def test_switching_without_an_identity_is_a_harmless_no_op(self):
+        resp = self.client.get(reverse("switch_identity"))
+        self.assertRedirects(resp, reverse("identity_pick"))
+        self.assertNotIn("member_id", self.client.session)
+
+    def test_after_switching_a_new_identity_can_be_picked(self):
+        self.login_as(self.alice)
+        self.client.get(reverse("switch_identity"))
+        self.client.get(reverse("pick_identity", args=[self.bob.id]))
+        self.assertEqual(self.client.session["member_id"], self.bob.id)
+
+
 class ChoreListTests(AuthClientMixin, TestCase):
     """The chore list view (authenticated)."""
 

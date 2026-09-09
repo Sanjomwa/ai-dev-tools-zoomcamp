@@ -5,6 +5,7 @@
 </head>
 <body>
   <h1>Chores</h1>
+  <p><a href="{% url 'switch_identity' %}">Switch identity</a></p>
   {% if not chores %}
     <p>No chores yet.</p>
   {% else %}

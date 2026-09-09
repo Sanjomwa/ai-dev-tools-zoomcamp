@@ -21,6 +21,16 @@ def pick_identity(request, member_id):
     return redirect("chore_list")
 
 
+def switch_identity(request):
+    # Leave the current identity (issue #11): drop the single session key the
+    # app uses for "who am I" and send the user back to the picker. Mirrors
+    # pick_identity's plain-GET style. Not guarded with require_identity —
+    # clearing an identity you might not have is a harmless no-op, and the
+    # redirect target is identity_pick either way.
+    request.session.pop("member_id", None)
+    return redirect("identity_pick")
+
+
 @require_identity
 def chore_list(request):
     household = Household.objects.first()
