@@ -6,6 +6,7 @@ Install deps: `uv sync`
 Run migrations: `uv run python manage.py migrate`
 Start dev server: `uv run python manage.py runserver`
 Run tests: `uv run python manage.py test`
+Seed demo data (local dev/QA, safe to re-run): `uv run python manage.py seed_demo`
 
 `chores/` is the Django app: models, views, templates, tests for the household/chore/rotation domain.
 `config/` is Django project config only: settings, root urlconf, wsgi/asgi — no domain logic goes here.

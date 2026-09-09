@@ -14,8 +14,10 @@ freezegun.
 """
 
 from datetime import datetime, timedelta, timezone as dt_timezone
+from io import StringIO
 from unittest.mock import patch
 
+from django.core.management import call_command
 from django.db.models import ProtectedError
 from django.test import TestCase
 from django.urls import reverse
@@ -467,3 +469,69 @@ class EndToEndFlowTests(TestCase):
         )
         with self.assertRaises(ProtectedError):
             m.delete()
+
+
+class SeedDemoCommandTests(AuthClientMixin, TestCase):
+    """``manage.py seed_demo`` -- the dev/QA data seeder (issue #13)."""
+
+    def run_seed(self):
+        out = StringIO()
+        call_command("seed_demo", stdout=out)
+        return out.getvalue()
+
+    def test_seeds_a_household_with_members_and_varied_chores(self):
+        self.run_seed()
+
+        self.assertEqual(Household.objects.count(), 1)
+        household = Household.objects.get()
+        self.assertGreaterEqual(household.members.count(), 3)
+        chores = household.chores.all()
+        self.assertGreaterEqual(chores.count(), 3)
+        # "varied cadences" -- more than one distinct cadence is present.
+        self.assertGreater(len({c.cadence for c in chores}), 1)
+        # Every holder belongs to this household, so mark_done can't 500.
+        member_ids = set(household.members.values_list("pk", flat=True))
+        self.assertTrue(all(c.current_holder_id in member_ids for c in chores))
+
+    def test_seeded_data_is_visible_in_the_app_views(self):
+        self.run_seed()
+        household = Household.objects.get()
+
+        # Identity-pick lists the seeded members.
+        resp = self.client.get(reverse("identity_pick"))
+        for member in household.members.all():
+            self.assertContains(resp, member.name)
+
+        # Pick one, then the chore list shows the seeded chores and an overdue flag.
+        first = household.members.first()
+        self.client.get(reverse("pick_identity", args=[first.id]))
+        resp = self.client.get(reverse("chore_list"))
+        self.assertEqual(resp.status_code, 200)
+        for chore in household.chores.all():
+            self.assertContains(resp, chore.name)
+        self.assertContains(resp, "Overdue")
+
+    def test_running_twice_is_a_safe_no_op(self):
+        self.run_seed()
+        h_count, m_count, c_count = (
+            Household.objects.count(),
+            Member.objects.count(),
+            Chore.objects.count(),
+        )
+        # Rotate a chore through the real mark-done view so its state genuinely
+        # differs from what the seed's `defaults` would write, then re-run: the
+        # second run must not renumber, re-add, or reset anything.
+        chore = Chore.objects.first()
+        self.login_as(chore.current_holder)
+        self.client.post(reverse("mark_done", args=[chore.id]))
+        chore.refresh_from_db()
+        rotated_holder, stamp = chore.current_holder, chore.last_completed_at
+
+        self.run_seed()
+
+        self.assertEqual(Household.objects.count(), h_count)
+        self.assertEqual(Member.objects.count(), m_count)
+        self.assertEqual(Chore.objects.count(), c_count)
+        chore.refresh_from_db()
+        self.assertEqual(chore.current_holder, rotated_holder)
+        self.assertEqual(chore.last_completed_at, stamp)
