@@ -157,3 +157,112 @@ def remove_member(request, member_id):
         return redirect("household_manage")
     messages.success(request, f'Removed "{member.name}".')
     return redirect("household_manage")
+
+
+# --- Chore management (issue #10) ------------------------------------------
+#
+# Not guarded with require_identity: like household_manage, this is admin-style
+# CRUD, not a "who am I" interaction. It manages the single existing household's
+# chores only (decisions.md #6) — no page here creates a Household, and the
+# holder <select> in both forms is always scoped to that household's members.
+
+_CADENCE_VALUES = {value for value, _ in Chore.Cadence.choices}
+
+
+def chore_manage(request):
+    household = Household.objects.first()
+    chores = household.chores.select_related("current_holder").all() if household else []
+    members = household.members.all() if household else []
+    return render(
+        request,
+        "chores/chore_manage.html",
+        {
+            "household": household,
+            "chores": chores,
+            "members": members,
+            "cadence_choices": Chore.Cadence.choices,
+        },
+    )
+
+
+def _clean_chore_fields(request, members):
+    """Read name / cadence / holder from POST.
+
+    Returns ``(name, cadence, holder)`` or ``None`` after queueing an error
+    message. ``members`` scopes the holder lookup to the household's own roster
+    (a `current_holder` value outside it resolves to nothing and is rejected),
+    and ``cadence`` is checked against ``Chore.Cadence`` rather than trusted —
+    a bad value would later break ``Chore.is_overdue``'s window lookup.
+    """
+    name = request.POST.get("name", "").strip()
+    cadence = request.POST.get("cadence", "")
+    holder_id = request.POST.get("current_holder", "")
+    if not name:
+        messages.error(request, "Chore name can't be blank.")
+        return None
+    if cadence not in _CADENCE_VALUES:
+        messages.error(request, "Pick a cadence of daily, weekly, or monthly.")
+        return None
+    holder = members.filter(pk=holder_id).first() if holder_id.isdigit() else None
+    if holder is None:
+        messages.error(request, "Pick a holder from this household's members.")
+        return None
+    return name, cadence, holder
+
+
+@require_POST
+def add_chore(request):
+    household = Household.objects.first()
+    if household is None:
+        messages.error(request, "No household has been set up yet.")
+        return redirect("chore_manage")
+    members = household.members.all()
+    if not members:
+        messages.error(
+            request,
+            "Add a member to the household before creating a chore — a chore "
+            "needs a real member to hold it.",
+        )
+        return redirect("chore_manage")
+    cleaned = _clean_chore_fields(request, members)
+    if cleaned is None:
+        return redirect("chore_manage")
+    name, cadence, holder = cleaned
+    Chore.objects.create(
+        household=household, name=name, cadence=cadence, current_holder=holder
+    )
+    messages.success(request, f'Added "{name}".')
+    return redirect("chore_manage")
+
+
+@require_POST
+def edit_chore(request, chore_id):
+    household = Household.objects.first()
+    if household is None:
+        messages.error(request, "No household has been set up yet.")
+        return redirect("chore_manage")
+    # Scoping by household as well as pk keeps a chore from another household
+    # (were one ever created) out of reach here.
+    chore = get_object_or_404(Chore, pk=chore_id, household=household)
+    cleaned = _clean_chore_fields(request, household.members.all())
+    if cleaned is None:
+        return redirect("chore_manage")
+    chore.name, chore.cadence, chore.current_holder = cleaned
+    chore.save()
+    messages.success(request, "Chore updated.")
+    return redirect("chore_manage")
+
+
+@require_POST
+def delete_chore(request, chore_id):
+    household = Household.objects.first()
+    if household is None:
+        messages.error(request, "No household has been set up yet.")
+        return redirect("chore_manage")
+    chore = get_object_or_404(Chore, pk=chore_id, household=household)
+    name = chore.name
+    # Nothing points at Chore with on_delete=PROTECT (issue #10), so unlike
+    # remove_member this needs no ProtectedError handling.
+    chore.delete()
+    messages.success(request, f'Removed "{name}".')
+    return redirect("chore_manage")

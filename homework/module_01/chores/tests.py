@@ -725,3 +725,192 @@ class HouseholdManageTests(TestCase):
         )
         self.assertEqual(Household.objects.count(), 0)
         self.assertEqual(Member.objects.count(), 0)
+
+
+class ChoreManageTests(AuthClientMixin, TestCase):
+    """The in-app chore management UI (issue #10)."""
+
+    def setUp(self):
+        self.h = Household.objects.create(name="H")
+        self.alice = Member.objects.create(household=self.h, name="Alice")
+        self.bob = Member.objects.create(household=self.h, name="Bob")
+
+    def make_chore(self, name="Dishes", cadence=Chore.Cadence.DAILY, holder=None):
+        return Chore.objects.create(
+            household=self.h,
+            name=name,
+            cadence=cadence,
+            current_holder=holder or self.alice,
+        )
+
+    def test_page_is_not_gated_by_require_identity(self):
+        # No session identity -- the page must still render (admin-style CRUD).
+        resp = self.client.get(reverse("chore_manage"))
+        self.assertEqual(resp.status_code, 200)
+
+    def test_page_lists_each_chore_with_its_cadence_label_and_holder(self):
+        self.make_chore(
+            name="Take out trash", cadence=Chore.Cadence.WEEKLY, holder=self.bob
+        )
+        resp = self.client.get(reverse("chore_manage"))
+        self.assertContains(resp, "Take out trash")
+        self.assertContains(resp, "Bob")
+        # Cadence <select> is populated from Chore.Cadence, not free text.
+        for _, label in Chore.Cadence.choices:
+            self.assertContains(resp, "<option", status_code=200)
+            self.assertContains(resp, label)
+        # The row carries the chore, its cadence and its holder in context.
+        listed = {c.name: c for c in resp.context["chores"]}
+        self.assertEqual(listed["Take out trash"].cadence, Chore.Cadence.WEEKLY)
+        self.assertEqual(listed["Take out trash"].current_holder, self.bob)
+
+    def test_add_chore_creates_it_and_it_shows_in_manage_and_chore_list(self):
+        resp = self.client.post(
+            reverse("add_chore"),
+            {
+                "name": "Sweep floors",
+                "cadence": Chore.Cadence.MONTHLY,
+                "current_holder": self.bob.id,
+            },
+            follow=True,
+        )
+        self.assertEqual(resp.status_code, 200)
+        chore = Chore.objects.get(name="Sweep floors")
+        self.assertEqual(chore.household, self.h)
+        self.assertEqual(chore.cadence, Chore.Cadence.MONTHLY)
+        self.assertEqual(chore.current_holder, self.bob)
+        # Visible on the management page...
+        self.assertContains(self.client.get(reverse("chore_manage")), "Sweep floors")
+        # ...and in chore_list (which is require_identity-gated).
+        self.login_as(self.alice)
+        self.assertContains(self.client.get(reverse("chore_list")), "Sweep floors")
+
+    def test_add_chore_rejects_a_blank_name(self):
+        resp = self.client.post(
+            reverse("add_chore"),
+            {"name": "   ", "cadence": Chore.Cadence.DAILY, "current_holder": self.alice.id},
+            follow=True,
+        )
+        self.assertEqual(Chore.objects.count(), 0)
+        self.assertContains(resp, "blank")
+
+    def test_add_chore_rejects_a_free_text_cadence(self):
+        resp = self.client.post(
+            reverse("add_chore"),
+            {
+                "name": "Sweep floors",
+                "cadence": "fortnightly",
+                "current_holder": self.alice.id,
+            },
+            follow=True,
+        )
+        self.assertEqual(Chore.objects.count(), 0)
+        self.assertContains(resp, "cadence")
+
+    def test_add_chore_rejects_a_holder_from_another_household(self):
+        other = Household.objects.create(name="Other")
+        outsider = Member.objects.create(household=other, name="Outsider")
+        resp = self.client.post(
+            reverse("add_chore"),
+            {
+                "name": "Sweep floors",
+                "cadence": Chore.Cadence.DAILY,
+                "current_holder": outsider.id,
+            },
+            follow=True,
+        )
+        self.assertEqual(Chore.objects.count(), 0)
+        self.assertContains(resp, "holder")
+
+    def test_edit_chore_updates_name_cadence_and_holder(self):
+        chore = self.make_chore(
+            name="Old name", cadence=Chore.Cadence.DAILY, holder=self.alice
+        )
+        resp = self.client.post(
+            reverse("edit_chore", args=[chore.id]),
+            {
+                "name": "New name",
+                "cadence": Chore.Cadence.WEEKLY,
+                "current_holder": self.bob.id,
+            },
+            follow=True,
+        )
+        self.assertEqual(resp.status_code, 200)
+        chore.refresh_from_db()
+        self.assertEqual(chore.name, "New name")
+        self.assertEqual(chore.cadence, Chore.Cadence.WEEKLY)
+        self.assertEqual(chore.current_holder, self.bob)
+
+    def test_edit_chore_will_not_set_a_holder_from_another_household(self):
+        other = Household.objects.create(name="Other")
+        outsider = Member.objects.create(household=other, name="Outsider")
+        chore = self.make_chore(holder=self.alice)
+        self.client.post(
+            reverse("edit_chore", args=[chore.id]),
+            {
+                "name": "Dishes",
+                "cadence": Chore.Cadence.DAILY,
+                "current_holder": outsider.id,
+            },
+        )
+        chore.refresh_from_db()
+        self.assertEqual(chore.current_holder, self.alice)
+
+    def test_delete_chore_removes_it_without_protectederror(self):
+        # A member currently holds this chore; deleting the chore still just
+        # works -- nothing points at Chore with on_delete=PROTECT.
+        chore = self.make_chore(holder=self.alice)
+        resp = self.client.post(reverse("delete_chore", args=[chore.id]), follow=True)
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(Chore.objects.filter(pk=chore.pk).exists())
+        self.assertTrue(Member.objects.filter(pk=self.alice.pk).exists())
+
+    def test_create_form_degrades_gracefully_when_the_household_has_no_members(self):
+        self.alice.delete()
+        self.bob.delete()
+        resp = self.client.get(reverse("chore_manage"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "no members")
+        # A POST anyway does not crash and creates nothing.
+        resp = self.client.post(
+            reverse("add_chore"),
+            {"name": "Sweep floors", "cadence": Chore.Cadence.DAILY, "current_holder": ""},
+            follow=True,
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(Chore.objects.count(), 0)
+
+    def test_no_page_here_creates_a_second_household(self):
+        self.client.post(
+            reverse("add_chore"),
+            {
+                "name": "Sweep floors",
+                "cadence": Chore.Cadence.DAILY,
+                "current_holder": self.alice.id,
+            },
+        )
+        self.client.post(
+            reverse("edit_chore", args=[Chore.objects.get().id]),
+            {
+                "name": "Sweep floors",
+                "cadence": Chore.Cadence.WEEKLY,
+                "current_holder": self.bob.id,
+            },
+        )
+        self.assertEqual(Household.objects.count(), 1)
+
+    def test_management_views_do_not_500_when_no_household_exists(self):
+        Chore.objects.all().delete()
+        Member.objects.all().delete()
+        Household.objects.all().delete()
+        self.assertEqual(self.client.get(reverse("chore_manage")).status_code, 200)
+        self.assertEqual(
+            self.client.post(
+                reverse("add_chore"),
+                {"name": "X", "cadence": Chore.Cadence.DAILY, "current_holder": "1"},
+                follow=True,
+            ).status_code,
+            200,
+        )
+        self.assertEqual(Household.objects.count(), 0)
+        self.assertEqual(Chore.objects.count(), 0)

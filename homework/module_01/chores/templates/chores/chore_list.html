@@ -6,6 +6,7 @@
 <body>
   <h1>{% if household %}{{ household.name }} &mdash; {% endif %}Chores</h1>
   <p><a href="{% url 'switch_identity' %}">Switch identity</a></p>
+  <p><a href="{% url 'chore_manage' %}">Manage chores</a></p>
   {% if not chores %}
     <p>No chores yet.</p>
   {% else %}

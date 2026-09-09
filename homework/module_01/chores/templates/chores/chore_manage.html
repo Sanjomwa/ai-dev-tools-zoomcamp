@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Manage chores</title>
+</head>
+<body>
+  <h1>Manage chores</h1>
+
+  {% if messages %}
+    <ul class="messages">
+      {% for message in messages %}
+        <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+
+  {% if not household %}
+    <p>No household has been set up yet.</p>
+  {% else %}
+    <p><a href="{% url 'household_manage' %}">Manage household &amp; members</a></p>
+
+    <h2>Chores</h2>
+    {% if not chores %}
+      <p>No chores yet.</p>
+    {% else %}
+      <ul>
+        {% for chore in chores %}
+          <li>
+            <form method="post" action="{% url 'edit_chore' chore.id %}" style="display: inline;">
+              {% csrf_token %}
+              <input type="text" name="name" value="{{ chore.name }}" aria-label="Chore name">
+              <select name="cadence" aria-label="Cadence">
+                {% for value, label in cadence_choices %}
+                  <option value="{{ value }}"{% if value == chore.cadence %} selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+              <select name="current_holder" aria-label="Current holder">
+                {% for member in members %}
+                  <option value="{{ member.id }}"{% if member.id == chore.current_holder_id %} selected{% endif %}>{{ member.name }}</option>
+                {% endfor %}
+              </select>
+              <button type="submit">Save</button>
+            </form>
+            <form method="post" action="{% url 'delete_chore' chore.id %}" style="display: inline;">
+              {% csrf_token %}
+              <button type="submit">Delete</button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+
+    <h2>Add a chore</h2>
+    {% if not members %}
+      <p>
+        This household has no members yet, so there's no one to hold a chore.
+        <a href="{% url 'household_manage' %}">Add a member first.</a>
+      </p>
+    {% else %}
+      <form method="post" action="{% url 'add_chore' %}">
+        {% csrf_token %}
+        <input type="text" name="name" aria-label="New chore name" placeholder="Chore name">
+        <select name="cadence" aria-label="Cadence">
+          {% for value, label in cadence_choices %}
+            <option value="{{ value }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+        <select name="current_holder" aria-label="Current holder">
+          {% for member in members %}
+            <option value="{{ member.id }}">{{ member.name }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit">Add chore</button>
+      </form>
+    {% endif %}
+  {% endif %}
+</body>
+</html>

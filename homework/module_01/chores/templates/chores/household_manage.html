@@ -17,6 +17,8 @@
   {% if not household %}
     <p>No household has been set up yet.</p>
   {% else %}
+    <p><a href="{% url 'chore_manage' %}">Manage chores</a></p>
+
     <h2>Household name</h2>
     <form method="post" action="{% url 'rename_household' %}">
       {% csrf_token %}
