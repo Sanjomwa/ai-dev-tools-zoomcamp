@@ -1,3 +1,4 @@
+from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -34,6 +35,10 @@ def chore_list(request):
 @require_POST
 def mark_done(request, chore_id):
     chore = get_object_or_404(Chore, pk=chore_id)
+    # Only the current holder may mark their own chore done (issue #8).
+    # require_identity guarantees member_id is set and points at a real Member.
+    if request.session["member_id"] != chore.current_holder_id:
+        return HttpResponseForbidden("Only the current holder can mark this chore done.")
     # "Next in rotation" is the following entry in the household's Meta-ordered
     # member list, wrapping to the first. Computed by position in that list, not
     # by `order + 1`: `order` can have gaps once a member is deleted, and a

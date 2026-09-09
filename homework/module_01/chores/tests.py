@@ -159,6 +159,9 @@ class RotationTests(AuthClientMixin, TestCase):
         first = chore.last_completed_at
         self.assertIsNotNone(first)
 
+        # The first completion rotated the holder to m1 (issue #8: only the
+        # current holder may mark done), so complete the second one as m1.
+        self.login_as(m1)
         self.client.post(reverse("mark_done", args=[chore.id]))
         chore.refresh_from_db()
         self.assertGreater(chore.last_completed_at, first)
@@ -202,6 +205,37 @@ class RotationTests(AuthClientMixin, TestCase):
         self.client.post(reverse("mark_done", args=[chore.id]))
         chore.refresh_from_db()
         self.assertFalse(chore.is_overdue)
+
+
+class MarkDoneHolderRestrictionTests(AuthClientMixin, TestCase):
+    """``mark_done`` may only be triggered by the chore's current holder (issue #8)."""
+
+    def setUp(self):
+        self.h = Household.objects.create(name="H")
+        self.holder = Member.objects.create(household=self.h, name="Holder")
+        self.other = Member.objects.create(household=self.h, name="Other")
+        self.chore = Chore.objects.create(
+            household=self.h,
+            name="Dishes",
+            cadence=Chore.Cadence.DAILY,
+            current_holder=self.holder,
+        )
+
+    def test_non_holder_post_is_forbidden_and_has_no_side_effect(self):
+        self.login_as(self.other)
+        resp = self.client.post(reverse("mark_done", args=[self.chore.id]))
+        self.assertEqual(resp.status_code, 403)
+        self.chore.refresh_from_db()
+        self.assertEqual(self.chore.current_holder, self.holder)
+        self.assertIsNone(self.chore.last_completed_at)
+
+    def test_holder_post_still_rotates_and_stamps(self):
+        self.login_as(self.holder)
+        resp = self.client.post(reverse("mark_done", args=[self.chore.id]))
+        self.assertRedirects(resp, reverse("chore_list"))
+        self.chore.refresh_from_db()
+        self.assertEqual(self.chore.current_holder, self.other)
+        self.assertIsNotNone(self.chore.last_completed_at)
 
 
 class RequireIdentityGuardTests(AuthClientMixin, TestCase):
