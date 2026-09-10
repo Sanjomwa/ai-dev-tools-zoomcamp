@@ -1,0 +1,3 @@
+# Normalize line endings on commit; check out LF on every platform.
+# Guards against a Windows/OneDrive round-trip reintroducing CRLF.
+* text=auto eol=lf

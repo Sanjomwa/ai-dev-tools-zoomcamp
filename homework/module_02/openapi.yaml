@@ -1,0 +1,291 @@
+openapi: 3.1.0
+info:
+  title: Leagueboard API
+  description: >
+    Backend contract for Leagueboard — a shared, no-login scoreboard for one
+    sports league (single league per deployment, no auth, no live push;
+    clients refresh to see others' changes). Derived from the frontend's
+    mock API module (`frontend/src/api/client.ts`), which is the only file
+    that changes once this backend exists behind it.
+  version: "0.1.0"
+servers:
+  - url: /api
+    description: Relative to the deployed backend origin
+
+tags:
+  - name: teams
+  - name: games
+  - name: standings
+
+paths:
+  /teams:
+    get:
+      operationId: listTeams
+      tags: [teams]
+      summary: List all teams
+      responses:
+        "200":
+          description: All teams in the league
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Team"
+    post:
+      operationId: addTeam
+      tags: [teams]
+      summary: Add a new team
+      description: >
+        Name only — no logo, no player roster. The server assigns `color`
+        (the reference frontend cycles a fixed 6-color palette by team
+        count; the backend is free to use an equivalent deterministic or
+        random assignment as long as every team gets a distinct display
+        color).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeamCreate"
+      responses:
+        "201":
+          description: The created team
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Team"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /games:
+    get:
+      operationId: listGames
+      tags: [games]
+      summary: List all games
+      description: >
+        Both scheduled and completed games. The reference frontend sorts
+        most-recently-scheduled first; the backend should return games in
+        that order so the client can render them as-is.
+      responses:
+        "200":
+          description: All games
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Game"
+    post:
+      operationId: scheduleGame
+      tags: [games]
+      summary: Schedule a game between two existing teams
+      description: >
+        Status starts as `scheduled`; no score yet. The MVP does not
+        validate scheduling conflicts beyond both teams existing.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GameCreate"
+      responses:
+        "201":
+          description: The scheduled game
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Game"
+        "404":
+          description: home or away team does not exist
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /games/{gameId}/score:
+    post:
+      operationId: recordScore
+      tags: [games]
+      summary: Record the score for a scheduled game
+      description: >
+        Marks the game `done` and sets its final score. The MVP does not
+        support editing or deleting a recorded score once saved, so this
+        operation is expected to succeed only while the game is still
+        `scheduled` — the backend should reject a second call for the same
+        game (409) rather than silently overwriting it, even though the
+        reference (mock) client does not enforce this itself.
+      parameters:
+        - name: gameId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScoreInput"
+      responses:
+        "200":
+          description: The updated (now completed) game
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Game"
+        "404":
+          description: No game with that id
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Game already has a recorded score
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /standings:
+    get:
+      operationId: getStandings
+      tags: [standings]
+      summary: Get the standings table
+      description: >
+        Computed, not stored — derived from completed (`done`) games only.
+        Win = 3 points, draw = 1, loss = 0. Ranked by points descending
+        (the reference implementation does not define a tiebreaker beyond
+        that).
+      responses:
+        "200":
+          description: One row per team, ranked by points descending
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StandingsRow"
+
+components:
+  responses:
+    ValidationError:
+      description: Request body failed validation
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  schemas:
+    Team:
+      type: object
+      required: [name, color]
+      properties:
+        name:
+          type: string
+          description: Team name; also used as its identifier by other endpoints.
+        color:
+          type: string
+          description: Hex display color, e.g. "#6ee7a0".
+          pattern: "^#[0-9a-fA-F]{6}$"
+
+    TeamCreate:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+
+    GameStatus:
+      type: string
+      enum: [scheduled, done]
+
+    Game:
+      type: object
+      required: [id, home, away, status, date]
+      properties:
+        id:
+          type: integer
+        home:
+          type: string
+          description: Home team name (matches a Team.name).
+        away:
+          type: string
+          description: Away team name (matches a Team.name).
+        status:
+          $ref: "#/components/schemas/GameStatus"
+        date:
+          type: string
+          format: date
+        homeScore:
+          type: integer
+          minimum: 0
+          nullable: true
+          description: Present only once status is "done".
+        awayScore:
+          type: integer
+          minimum: 0
+          nullable: true
+          description: Present only once status is "done".
+
+    GameCreate:
+      type: object
+      required: [home, away, date]
+      properties:
+        home:
+          type: string
+          description: Must match an existing Team.name.
+        away:
+          type: string
+          description: Must match an existing Team.name.
+        date:
+          type: string
+          format: date
+
+    ScoreInput:
+      type: object
+      required: [homeScore, awayScore]
+      properties:
+        homeScore:
+          type: integer
+          minimum: 0
+        awayScore:
+          type: integer
+          minimum: 0
+
+    StandingsRow:
+      type: object
+      required: [name, color, played, won, drawn, lost, points]
+      properties:
+        name:
+          type: string
+        color:
+          type: string
+          pattern: "^#[0-9a-fA-F]{6}$"
+        played:
+          type: integer
+          minimum: 0
+        won:
+          type: integer
+          minimum: 0
+        drawn:
+          type: integer
+          minimum: 0
+        lost:
+          type: integer
+          minimum: 0
+        points:
+          type: integer
+          minimum: 0
+
+    Error:
+      type: object
+      required: [detail]
+      properties:
+        detail:
+          type: string
