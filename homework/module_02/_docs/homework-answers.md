@@ -12,7 +12,7 @@
 
 ## Question 3: GitHub Repository
 
-**`<commit sha — fill in after Sam commits and pushes this change>`.** As of this commit, `_docs/plan.md` (this project's spec file — named `plan.md` rather than the homework's suggested `specs.md`, consistent with `homework/module_01/`'s own convention), the repo-root `.gitignore`, `AGENTS.md`, and `README.md` are all in place under `homework/module_02/`.
+**`baebec66988f4d26e7ca557e3a040ef79f75877b`.** As of this commit, `_docs/plan.md` (this project's spec file — named `plan.md` rather than the homework's suggested `specs.md`, consistent with `homework/module_01/`'s own convention), the repo-root `.gitignore`, `AGENTS.md`, and `README.md` are all in place under `homework/module_02/`.
 
 ## Question 4: Frontend prototype
 
