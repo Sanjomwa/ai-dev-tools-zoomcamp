@@ -42,6 +42,8 @@ export default function App() {
     await refresh();
   }
 
+  const matchweek = rows.length > 0 ? Math.max(...rows.map((r) => r.played)) : 0;
+
   return (
     <div className="app">
       <div className="head">
@@ -50,7 +52,7 @@ export default function App() {
           <span className="league">Riverside Sunday League</span>
         </div>
         <div className="meta">
-          Matchweek 8
+          Matchweek {matchweek}
           <span className="meta-sub">No login · anyone with the link can edit</span>
         </div>
       </div>
@@ -68,10 +70,6 @@ export default function App() {
           {tab === "teams" && <TeamsScreen teams={teams} rows={rows} onAddTeam={handleAddTeam} />}
         </>
       )}
-
-      <p className="footnote">
-        Backend calls are mocked in <code>src/api/client.ts</code> — swap that file for real fetch() calls later; nothing else changes.
-      </p>
     </div>
   );
 }
