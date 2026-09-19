@@ -30,4 +30,4 @@
 
 ## Question 7: Reflection
 
-_Not yet finalized._
+Swapping a database engine isn't just a syntax problem — it can silently drop guarantees your code was quietly depending on. The starter's SQLite implementation used `BEGIN IMMEDIATE` to serialize writer transactions; that wasn't just SQLite-flavored SQL, it was the entire mechanism keeping concurrent task claims from racing. Porting to Postgres without noticing this reintroduces a real concurrency bug, since Postgres accepts the statement but gives it no such meaning. Practical takeaway: when porting between databases, audit what a call is silently doing for you, not just whether its syntax is portable.
